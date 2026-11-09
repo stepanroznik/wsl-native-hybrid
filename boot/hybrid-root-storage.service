@@ -1,0 +1,12 @@
+[Unit]
+Description=Keep the shared root NBD server through native shutdown
+DefaultDependencies=no
+IgnoreOnIsolate=yes
+RefuseManualStop=yes
+SurviveFinalKillSignal=yes
+Before=basic.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'echo $$(cat /run/initramfs/hybrid-nbd.pid) > /sys/fs/cgroup/system.slice/hybrid-root-storage.service/cgroup.procs'

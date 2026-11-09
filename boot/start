@@ -1,0 +1,146 @@
+#!/bin/sh
+set -eu
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LD_LIBRARY_PATH=/lib/x86_64-linux-gnu
+exec </dev/console >/dev/console 2>&1
+umask 077
+. /hybrid.conf
+fail() {
+    printf 'HYBRID_BOOT_FAILED: %s\n' "$*"
+    printf 'Press Enter to clean up and power off.\n'
+    IFS= read -r ignored || true
+    exec /shutdown poweroff
+}
+partition() {
+    for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        found=''
+        for item in /sys/class/block/*/partition; do
+            base=${item%/partition}
+            dev=/dev/${base##*/}
+            [ -b "$dev" ] || continue
+            id=$(/usr/bin/blkid -p -s PART_ENTRY_UUID -o value "$dev" 2>/dev/null || true)
+            [ "$id" = "$1" ] || continue
+            [ -z "$found" ] || return 1
+            found=$dev
+        done
+        if [ -n "$found" ]; then printf '%s\n' "$found"; return; fi
+        sleep 1
+    done
+    return 1
+}
+mount -t tmpfs -o mode=0700,nosuid,nodev tmpfs /run || fail 'runtime mount'
+probe=no
+if grep -qw hybrid.probe=1 /proc/cmdline; then probe=yes; fi
+for module in nvme vmd ahci virtio_pci virtio_blk xhci_pci usbhid; do
+    /usr/bin/modprobe "$module" 2>/dev/null || true
+done
+for module in ntfs3 dm_crypt dm_zero vfat nls_cp437 nls_iso8859_1 loop; do
+    /usr/bin/modprobe "$module" || fail "module $module"
+done
+echo 'HYBRID_STAGE: locating the backing Windows partition'
+windows=$(partition "$host_partuuid") || fail 'Windows partition missing or ambiguous'
+device=$windows
+ro=''
+nbd_ro=''
+if [ "$probe" = yes ]; then ro=--readonly; nbd_ro=--read-only; fi
+case "$encryption" in
+    none) ;;
+    bitlocker)
+        dmesg -n 3 || true
+        sleep 3
+        /prepare-console || fail 'console input preparation'
+        printf 'Enter the Windows volume recovery password at the cryptsetup prompt.\n'
+        cryptsetup open --type bitlk --tries 1 $ro "$windows" hybrid_host || fail 'BitLocker unlock'
+        device=/dev/mapper/hybrid_host;;
+    vault)
+        esp=$(partition "$esp_partuuid") || fail 'EFI partition missing or ambiguous'
+        mount -t vfat -o ro,nosuid,nodev,noexec "$esp" /esp || fail 'EFI mount'
+        [ -f /esp/EFI/HybridWSL/windows-unlock.luks ] || fail 'vault not found'
+        dmesg -n 3 || true
+        sleep 3
+        /prepare-console || fail 'console input preparation'
+        cryptsetup open --type luks --readonly --tries 1 /esp/EFI/HybridWSL/windows-unlock.luks hybrid_vault || fail 'vault unlock'
+        # Use the raw recovery-password record through a RAM-backed pipe.
+        dd if=/dev/mapper/hybrid_vault bs=55 count=1 status=none |
+            cryptsetup open --type bitlk --key-file - $ro "$windows" hybrid_host || fail 'BitLocker unlock from vault'
+        cryptsetup close hybrid_vault || fail 'vault close'
+        umount /esp || fail 'EFI unmount'
+        device=/dev/mapper/hybrid_host;;
+    *) fail 'invalid encryption mode';;
+esac
+if [ "$probe" = yes ]; then
+    host_mode=ro
+else
+    echo 'HYBRID_STAGE: checking Windows write readiness'
+    timeout -k 5 30 ntfs-3g.probe --readwrite "$device" || fail 'NTFS is dirty, hibernated, or unavailable for writing'
+    host_mode=rw
+fi
+echo "HYBRID_STAGE: mounting NTFS $host_mode"
+timeout -k 5 45 mount -t ntfs3 -o "$host_mode,nosuid,nodev,noexec,windows_names,uid=$desktop_uid,gid=$desktop_gid,fmask=0177,dmask=0077" "$device" /host || fail 'NTFS mount'
+archive=/host$runtime_path
+image=/host$root_path
+for file in "$archive" "$image"; do
+    [ -f "$file" ] && [ "$(readlink -f "$file")" = "$file" ] || fail 'backing file missing or redirected'
+done
+printf '%s  %s\n' "$runtime_sha256" "$archive" | sha256sum -c - || fail 'runtime archive integrity'
+tar -xzf "$archive" -C / || fail 'runtime archive extraction'
+for module in nbd ext4; do /usr/bin/modprobe "$module" || fail "module $module"; done
+echo 'HYBRID_STAGE: attaching the VHDX'
+/usr/bin/timeout -k 5 30 /keep-root-nbd --fork --persistent --pid-file=/run/hybrid-nbd.pid \
+    --format=vhdx --cache=none --socket=/run/hybrid-nbd.sock $nbd_ro "$image" || fail 'VHDX server'
+/usr/bin/timeout -k 5 30 /usr/bin/nbd-client -unix /run/hybrid-nbd.sock /dev/nbd0 || fail 'NBD connection'
+if [ "$probe" = yes ]; then
+    [ "$(blockdev --getro /dev/nbd0)" = 1 ] || fail 'probe NBD device is writable'
+    timeout -k 5 45 mount -t ext4 -o ro,noload /dev/nbd0 /newroot || fail 'read-only ext4 mount'
+else
+    echo 'HYBRID_STAGE: mounting writable Ubuntu root'
+    timeout -k 5 60 mount -t ext4 -o rw /dev/nbd0 /newroot || fail 'ext4 mount'
+fi
+[ -x /newroot/sbin/init ] && [ -f /newroot/etc/os-release ] || fail 'expected Linux root not found'
+if [ "$probe" = yes ]; then
+    echo 'HYBRID_READ_ONLY_PASSED: reached the existing Ubuntu root without writing to it.'
+    printf 'Press Enter to power off.\n'
+    IFS= read -r ignored || true
+    exec /shutdown poweroff
+fi
+pid=$(cat /run/hybrid-nbd.pid)
+tr '\000' '\n' < "/proc/$pid/cmdline" | head -n 1 | grep -qx '@qemu-nbd' || fail 'NBD daemon shutdown protection'
+printf '%s\n' "$pid" > /hybrid-nbd.pid
+release=$(uname -r)
+mkdir -p "/newroot/usr/lib/modules/$release" /newroot/run /newroot/proc /newroot/sys /newroot/dev
+mount -o bind "/lib/modules/$release" "/newroot/usr/lib/modules/$release" || fail 'native kernel modules'
+if [ -d /lib/firmware ] && [ -d /newroot/usr/lib/firmware ]; then
+    mount -o bind /lib/firmware /newroot/usr/lib/firmware || fail 'native firmware mount'
+fi
+if [ "$windows_access" != none ]; then
+    mkdir -p /newroot/mnt/c
+    mount -o bind /host /newroot/mnt/c || fail 'Windows view'
+    if [ "$windows_access" = read-only ]; then
+        mount -o remount,bind,ro,nosuid,nodev,noexec /newroot/mnt/c || fail 'read-only Windows view'
+    else
+        for protected in "${root_path%/*}" "${runtime_path%/*}"; do
+            mount -o bind "/host$protected" "/newroot/mnt/c$protected" || fail 'protect backing files'
+            mount -o remount,bind,ro,nosuid,nodev,noexec "/newroot/mnt/c$protected" || fail 'protect backing files read-only'
+        done
+    fi
+fi
+# Native services need /run to be traversable once the unlock phase is over.
+chmod 0755 /run
+umask 022
+mkdir -p /run/systemd/system/basic.target.wants
+cp /hybrid-root-storage.service /run/systemd/system/
+ln -s ../hybrid-root-storage.service /run/systemd/system/basic.target.wants/hybrid-root-storage.service
+if [ "$(readlink /newroot/etc/resolv.conf 2>/dev/null || true)" = /mnt/wsl/resolv.conf ]; then
+    mkdir -p /run/hybrid-resolver /newroot/mnt/wsl
+    ln -s /run/systemd/resolve/stub-resolv.conf /run/hybrid-resolver/resolv.conf
+    mount -o bind /run/hybrid-resolver /newroot/mnt/wsl || fail 'native resolver bind'
+fi
+printf 'HYBRID_STAGE: starting native systemd\n'
+mount --move /run /newroot/run || fail 'move /run'
+mkdir -p /newroot/run/initramfs
+for directory in proc sys dev; do
+    mount --move "/$directory" "/newroot/$directory" || fail "move /$directory"
+done
+cd /newroot
+pivot_root . run/initramfs || exec sh
+exec /sbin/init

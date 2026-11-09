@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mount -t devtmpfs devtmpfs /dev
+exec </dev/console >/dev/console 2>&1
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t tmpfs -o mode=0700 tmpfs /bootstrap
+tar -xzf /bootroot.tar.gz -C /bootstrap
+for directory in proc sys dev; do
+    mount --move "/$directory" "/bootstrap/$directory"
+done
+exec switch_root /bootstrap /start
