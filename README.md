@@ -1,4 +1,4 @@
-# One Ubuntu. Two ways in.
+# One Ubuntu with two ways in
 
 ![WSL on Windows and native Ubuntu connected to the same Linux filesystem](assets/hybrid.svg)
 
