@@ -1,35 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title description">
-  <title id="title">One Ubuntu, two ways in</title>
-  <desc id="description">A Windows WSL window and an Ubuntu desktop are connected to one shared Linux filesystem.</desc>
-  <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#101b36"/>
-      <stop offset="1" stop-color="#291b3c"/>
-    </linearGradient>
-    <linearGradient id="link" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#43a9ff"/>
-      <stop offset="1" stop-color="#f37c47"/>
-    </linearGradient>
-  </defs>
-  <rect width="1200" height="300" rx="24" fill="url(#background)"/>
-  <text x="600" y="48" text-anchor="middle" fill="#f5f7ff" font-family="system-ui, sans-serif" font-size="27" font-weight="700">One Ubuntu. Two ways in.</text>
-  <rect x="85" y="82" width="272" height="143" rx="18" fill="#172c4d" stroke="#315c8a" stroke-width="2"/>
-  <rect x="129" y="118" width="25" height="25" rx="2" fill="#53b9ff"/>
-  <rect x="159" y="118" width="25" height="25" rx="2" fill="#53b9ff"/>
-  <rect x="129" y="148" width="25" height="25" rx="2" fill="#53b9ff"/>
-  <rect x="159" y="148" width="25" height="25" rx="2" fill="#53b9ff"/>
-  <text x="212" y="140" fill="#fff" font-family="system-ui, sans-serif" font-size="26" font-weight="700">WSL 2</text>
-  <text x="212" y="168" fill="#abc8e9" font-family="system-ui, sans-serif" font-size="16">on Windows</text>
-  <path d="M365 153 H458 M742 153 H835" stroke="url(#link)" stroke-width="5" stroke-linecap="round"/>
-  <rect x="462" y="115" width="276" height="76" rx="18" fill="#222746" stroke="#776c97" stroke-width="2"/>
-  <text x="600" y="149" text-anchor="middle" fill="#fff" font-family="system-ui, sans-serif" font-size="21" font-weight="700">Shared Ubuntu root</text>
-  <text x="600" y="174" text-anchor="middle" fill="#c2c3db" font-family="system-ui, sans-serif" font-size="15">one VHDX · same files</text>
-  <rect x="843" y="82" width="272" height="143" rx="18" fill="#3d2532" stroke="#a55243" stroke-width="2"/>
-  <circle cx="912" cy="149" r="30" fill="none" stroke="#ff8655" stroke-width="9"/>
-  <circle cx="912" cy="111" r="6" fill="#ff8655"/>
-  <circle cx="879" cy="168" r="6" fill="#ff8655"/>
-  <circle cx="945" cy="168" r="6" fill="#ff8655"/>
-  <text x="964" y="140" fill="#fff" font-family="system-ui, sans-serif" font-size="26" font-weight="700">Ubuntu</text>
-  <text x="964" y="168" fill="#f2bba9" font-family="system-ui, sans-serif" font-size="16">native boot</text>
-  <text x="600" y="258" text-anchor="middle" fill="#adb8d5" font-family="system-ui, sans-serif" font-size="16">Your Linux environment, on your terms</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="190" viewBox="0 0 1000 190" role="img" aria-labelledby="title description">
+  <title id="title">WSL and Ubuntu share a VHDX</title>
+  <desc id="description">Windows Subsystem for Linux and a native Ubuntu boot connect to the same virtual disk.</desc>
+  <rect width="1000" height="190" rx="8" fill="#f7f8fa"/>
+
+  <g fill="#0078d4">
+    <rect x="116" y="43" width="27" height="27"/>
+    <rect x="148" y="43" width="27" height="27"/>
+    <rect x="116" y="75" width="27" height="27"/>
+    <rect x="148" y="75" width="27" height="27"/>
+  </g>
+  <text x="145" y="145" text-anchor="middle" fill="#24292f" font-family="Arial, sans-serif" font-size="22">WSL 2</text>
+
+  <path d="M220 72 H384 M616 72 H780" fill="none" stroke="#a0a8b3" stroke-width="2"/>
+  <circle cx="220" cy="72" r="4" fill="#a0a8b3"/>
+  <circle cx="780" cy="72" r="4" fill="#a0a8b3"/>
+  <rect x="384" y="42" width="232" height="60" rx="7" fill="#fff" stroke="#a0a8b3" stroke-width="2"/>
+  <text x="500" y="80" text-anchor="middle" fill="#24292f" font-family="Arial, sans-serif" font-size="20">Shared VHDX</text>
+
+  <g fill="none" stroke="#e95420" stroke-width="8">
+    <circle cx="854" cy="72" r="24"/>
+  </g>
+  <g fill="#e95420" stroke="#f7f8fa" stroke-width="3">
+    <circle cx="854" cy="42" r="7"/>
+    <circle cx="828" cy="87" r="7"/>
+    <circle cx="880" cy="87" r="7"/>
+  </g>
+  <text x="854" y="145" text-anchor="middle" fill="#24292f" font-family="Arial, sans-serif" font-size="22">Ubuntu</text>
 </svg>
