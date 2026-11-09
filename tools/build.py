@@ -155,7 +155,7 @@ def build(args):
             put(BOOT / name, inner / name)
         for path in (outer / 'init', inner / 'start', inner / 'shutdown'):
             path.chmod(0o755)
-        for command in ('blkid', 'cryptsetup', 'modprobe', 'qemu-nbd', 'ntfs-3g.probe', 'timeout'):
+        for command in ('blkid', 'cryptsetup', 'dmsetup', 'modprobe', 'qemu-nbd', 'ntfs-3g.probe', 'timeout'):
             pack_tool(executable(command), 'usr/bin/' + command, inner)
         # The shutdown helper must stay in the initramfs after pivot_root.
         pack_tool(args.nbd_client or executable('nbd-client'), 'usr/bin/nbd-client', inner, args.nbd_library_path)

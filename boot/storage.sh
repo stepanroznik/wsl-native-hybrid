@@ -1,6 +1,14 @@
 # Sourced by early boot and the shutdown program. Names belong to this payload.
 mounted() { awk -v path="$1" '$2 == path {found=1} END {exit !found}' /proc/mounts; }
 
+mapping_present() {
+    for entry in /sys/class/block/dm-*/dm/name; do
+        [ -r "$entry" ] || continue
+        [ "$(cat "$entry")" = "$1" ] && return 0
+    done
+    return 1
+}
+
 unmount_tree() {
     mount_root=$1
     if mounted "$mount_root"; then
@@ -32,11 +40,12 @@ stop_storage() {
     fi
     if mounted /host; then umount /host || return 1; fi
     if mounted /esp; then umount /esp || return 1; fi
+    mounted /sys || return 1
     for mapping in hybrid_host hybrid_vault; do
-        if cryptsetup status "$mapping" >/dev/null 2>&1; then
-            cryptsetup close "$mapping" || return 1
-        else
-            [ "$?" -eq 4 ] || return 1
+        if mapping_present "$mapping"; then
+            echo "HYBRID_CLOSING_MAPPING $mapping"
+            timeout -k 5 15 dmsetup --noudevsync remove "$mapping" || return 1
+            ! mapping_present "$mapping" || return 1
         fi
     done
 }

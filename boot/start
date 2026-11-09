@@ -85,9 +85,9 @@ done
 printf '%s  %s\n' "$runtime_sha256" "$archive" | sha256sum -c - || fail 'runtime archive integrity'
 tar -xzf "$archive" -C / || fail 'runtime archive extraction'
 for module in nbd ext4; do /usr/bin/modprobe "$module" || fail "module $module"; done
-echo 'HYBRID_STAGE: attaching the VHDX'
-/usr/bin/timeout -k 5 30 /keep-root-nbd --fork --persistent --pid-file=/run/hybrid-nbd.pid \
-    --format=vhdx --cache=none --socket=/run/hybrid-nbd.sock $nbd_ro "$image" || fail 'VHDX server'
+echo 'HYBRID_STAGE: attaching the VHDX (120 second limit)'
+/usr/bin/timeout -k 5 120 /keep-root-nbd --fork --persistent --pid-file=/run/hybrid-nbd.pid \
+    --format=vhdx --cache=writethrough --socket=/run/hybrid-nbd.sock $nbd_ro "$image" || fail 'VHDX server'
 /usr/bin/timeout -k 5 30 /usr/bin/nbd-client -unix /run/hybrid-nbd.sock /dev/nbd0 || fail 'NBD connection'
 if [ "$probe" = yes ]; then
     [ "$(blockdev --getro /dev/nbd0)" = 1 ] || fail 'probe NBD device is writable'

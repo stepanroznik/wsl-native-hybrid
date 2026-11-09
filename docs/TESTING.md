@@ -6,6 +6,8 @@ The original machine-specific prototype was tested with disposable VHDX/BitLocke
 
 The generalized scripts in this repository have different configuration and packaging. A pass in the original prototype is not evidence that every generalized feature has been tested. The reconstructed builder and its read-only boot entry passed a disposable QEMU test with a synthetic GPT disk, NTFS volume and ext4 VHDX. The test confirmed read-only attachment and clean shutdown. The reconstructed writable desktop, BitLocker unlock, Secure Boot chain, and firmware Windows handoff have not yet been tested end to end. Do not test a new build first on your only installation.
 
+The original prototype later booted and restarted successfully using buffered VHDX access with write flushing and bounded device-mapper cleanup without udev synchronization. The corresponding changes in this generalized repository need a fresh end-to-end test.
+
 ## Static checks
 
 ```sh
